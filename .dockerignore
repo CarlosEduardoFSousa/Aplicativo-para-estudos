@@ -1,0 +1,12 @@
+.git
+.github
+.idea
+.runtime
+tcc_conectado
+biblioteca
+tests
+config.local.php
+*.md
+*.log
+php_appest/tests
+

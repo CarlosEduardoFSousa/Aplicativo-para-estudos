@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/main" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="24dp" android:background="@color/BackGround">
+    <TextView android:id="@+id/tvContador" android:layout_width="wrap_content" android:layout_height="wrap_content"
+        android:textColor="@color/BordaButton" android:textSize="14sp" />
+    <ProgressBar android:id="@+id/progressBar" style="?android:attr/progressBarStyleHorizontal"
+        android:layout_width="match_parent" android:layout_height="8dp" android:layout_marginTop="8dp"
+        android:progressTint="@color/PreencherBarra" />
+    <ProgressBar android:id="@+id/progressCarregando" android:layout_width="wrap_content"
+        android:layout_height="wrap_content" android:visibility="gone" />
+    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+            <TextView android:id="@+id/txtPergunta" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="24dp" android:layout_marginBottom="16dp"
+                android:textColor="@color/btnSelecionado" android:textSize="20sp" android:textIsSelectable="true" />
+            <Button android:id="@+id/btnOpcaoA" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:padding="16dp" android:textAllCaps="false"
+                android:backgroundTint="@color/btnOpcoes" android:textColor="@color/BordaButton" android:textSize="16sp" />
+            <Button android:id="@+id/btnOpcaoB" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:padding="16dp" android:textAllCaps="false"
+                android:backgroundTint="@color/btnOpcoes" android:textColor="@color/BordaButton" android:textSize="16sp" />
+            <Button android:id="@+id/btnOpcaoC" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:padding="16dp" android:textAllCaps="false"
+                android:backgroundTint="@color/btnOpcoes" android:textColor="@color/BordaButton" android:textSize="16sp" />
+            <Button android:id="@+id/btnOpcaoD" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="8dp" android:padding="16dp" android:textAllCaps="false"
+                android:backgroundTint="@color/btnOpcoes" android:textColor="@color/BordaButton" android:textSize="16sp" />
+        </LinearLayout>
+    </ScrollView>
+    <Button android:id="@+id/btnConfirmar" android:layout_width="match_parent" android:layout_height="wrap_content"
+        android:layout_marginTop="12dp" android:padding="16dp" android:text="CONFIRMAR"
+        android:backgroundTint="@color/btnSelecionado" android:textColor="@color/btnOpcoes" />
+</LinearLayout>

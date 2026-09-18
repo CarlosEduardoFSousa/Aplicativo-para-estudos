@@ -1,0 +1,5 @@
+# Copie para local.properties e configure o Android SDK.
+sdk.dir=C\:\\Users\\SEU_USUARIO\\AppData\\Local\\Android\\Sdk
+
+# GEMINI_API_KEY e GEMINI_MODEL agora são configurados apenas no servidor PHP.
+# Veja ../BIBLIOTECA.md. Não coloque a chave no Android.
