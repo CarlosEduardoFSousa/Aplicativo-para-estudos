@@ -4,6 +4,7 @@ import java.io.BufferedReader
 import java.io.InputStreamReader
 import java.io.OutputStreamWriter
 import java.net.HttpURLConnection
+import java.net.URLEncoder
 import java.net.URL
 
 /** Resposta crua do servidor: código HTTP + corpo. */
@@ -38,12 +39,14 @@ object ApiClient {
             conn.doOutput = true
             conn.connectTimeout = 8000
             conn.readTimeout = timeoutMs
+            conn.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8")
+            conn.setRequestProperty("Accept", "application/json")
 
             val body = params.entries.joinToString("&") { (k, v) ->
-                "${k}=${java.net.URLEncoder.encode(v, "UTF-8")}"
+                "${URLEncoder.encode(k, "UTF-8")}=${URLEncoder.encode(v, "UTF-8")}"
             }
 
-            OutputStreamWriter(conn.outputStream).use { it.write(body) }
+            OutputStreamWriter(conn.outputStream, Charsets.UTF_8).use { it.write(body) }
 
             val codigo = conn.responseCode
             val stream = if (codigo in 200..299) conn.inputStream else conn.errorStream

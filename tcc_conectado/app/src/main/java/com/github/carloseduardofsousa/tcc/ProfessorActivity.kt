@@ -183,9 +183,10 @@ class ProfessorActivity : AppCompatActivity() {
                 }
 
                 rvTurmas.adapter = TurmaAdapter(turmas) { turma ->
-                    val intent = Intent(this, TurmaDesempenhoActivity::class.java)
+                    val intent = Intent(this, EnviarPromptActivity::class.java)
                     intent.putExtra("ID_TURMA", turma.idTurma)
                     intent.putExtra("NOME_TURMA", turma.nomeTurma)
+                    intent.putExtra("TOTAL_ALUNOS", turma.totalAlunos)
                     intent.putExtra("NOME_PROFESSOR", nomeProfessor)
                     startActivity(intent)
                 }

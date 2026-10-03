@@ -1,68 +1,82 @@
 package com.github.carloseduardofsousa.tcc
 
 import android.content.Intent
+import android.content.res.ColorStateList
 import android.graphics.Color
 import android.graphics.Typeface
-import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
 import android.view.ViewGroup
-import android.widget.Button
+import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.ScrollView
 import android.widget.TextView
+import androidx.annotation.DrawableRes
 import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.card.MaterialCardView
 
 class MenuActivity : AppCompatActivity() {
+    private lateinit var opcoes: LinearLayout
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        if (!Sessao.estaLogado(this)) { voltarLogin(); return }
-        val root = LinearLayout(this).apply {
-            orientation = LinearLayout.VERTICAL
-            val p=(24*resources.displayMetrics.density).toInt(); setPadding(p,p,p,p)
+        if (!Sessao.estaLogado(this)) { Sessao.limpar(this); voltarLogin(); return }
+        setContentView(R.layout.activity_menu)
+
+        opcoes=findViewById(R.id.containerOpcoesMenu)
+        findViewById<TextView>(R.id.tvSaudacaoMenu).text="Olá, ${Sessao.nome(this)}\nO que você deseja fazer?"
+        findViewById<MaterialButton>(R.id.btnSairMenu).setOnClickListener {
+            Sessao.encerrar(this); finish()
         }
-        root.addView(TextView(this).apply {
-            text="Academia de Gênios"; textSize=29f; setTextColor(Color.parseColor("#1A237E")); typeface=Typeface.DEFAULT_BOLD
-        })
-        root.addView(TextView(this).apply {
-            text="Olá, ${Sessao.nome(this@MenuActivity)}\nO que você deseja fazer?"; textSize=18f
-            setTextColor(Color.parseColor("#4D5066")); setPadding(0,12,0,26)
-        })
-        when (Sessao.tipoPerfil(this)) {
-            "aluno" -> {
-                opcao(root,"📚","Estudar","Escolha uma matéria e um capítulo") { abrir(SelecionarMateriaActivity::class.java) }
-                opcao(root,"📊","Meu desempenho","Veja seus acertos por matéria e capítulo") { abrir(DesempenhoTopicosActivity::class.java) }
-                opcao(root,"🏆","Ranking da minha série","Compare sua pontuação mensal") { abrirSelecao("RANKING_SERIE") }
-            }
-            "professor" -> {
-                opcao(root,"📈","Gráficos das turmas","Compare dificuldades por matéria e capítulo") { abrirSelecao("GRAFICOS_TURMA") }
-                opcao(root,"🏆","Ranking da escola","Selecione a série e veja a classificação") { abrirSelecao("RANKING_SERIE") }
-                opcao(root,"🎯","Personalização de estudo","Escolha turma e aluno para orientar o estudo") { abrir(ProfessorActivity::class.java) }
-            }
-            "admin" -> opcao(root,"⚙️","Coordenação","Acesse as funções administrativas atuais") { abrir(CoordenacaoActivity::class.java) }
-            else -> { Sessao.limpar(this); voltarLogin(); return }
+
+        val perfil=Sessao.tipoPerfil(this)
+        findViewById<TextView>(R.id.tvPerfilMenu).text=when(perfil){
+            "aluno"->"ÁREA DO ALUNO"; "professor"->"ÁREA DO PROFESSOR"; else->""
         }
-        root.addView(Button(this).apply { text="Sair"; setOnClickListener { Sessao.encerrar(this@MenuActivity); finish() } })
-        setContentView(ScrollView(this).apply { addView(root) })
+        when(perfil){
+            "aluno"->{
+                opcao(R.drawable.ic_menu_study,"Estudar","Escolha uma matéria, frente e capítulo") { abrir(SelecionarMateriaActivity::class.java) }
+                opcao(R.drawable.ic_menu_chart,"Meu desempenho","Acompanhe seus acertos por matéria e capítulo") { abrir(DesempenhoTopicosActivity::class.java) }
+                opcao(R.drawable.ic_menu_study,"Meu histórico","Revise suas respostas e retome os capítulos estudados") { abrir(HistoricoActivity::class.java) }
+                opcao(R.drawable.ic_menu_trophy,"Ranking da minha série","Veja sua posição e pontuação mensal") { abrirSelecao("RANKING_SERIE") }
+            }
+            "professor"->{
+                opcao(R.drawable.ic_menu_chart,"Gráficos das turmas","Analise dificuldades por matéria e capítulo") { abrirSelecao("GRAFICOS_TURMA") }
+                opcao(R.drawable.ic_menu_trophy,"Ranking da escola","Selecione uma série e veja a classificação") { abrirSelecao("RANKING_SERIE") }
+                opcao(R.drawable.ic_menu_target,"Personalização de estudo","Oriente os estudos de toda a turma") { abrir(ProfessorActivity::class.java) }
+            }
+            else->{Sessao.limpar(this);voltarLogin()}
+        }
     }
 
-    private fun opcao(root:LinearLayout, emoji:String, titulo:String, descricao:String, click:()->Unit) {
-        root.addView(LinearLayout(this).apply {
-            orientation=LinearLayout.HORIZONTAL; gravity=Gravity.CENTER_VERTICAL; setPadding(22,22,22,22)
-            background=GradientDrawable().apply { setColor(Color.WHITE); cornerRadius=22f; setStroke(2,Color.parseColor("#E4E6F2")) }
-            layoutParams=LinearLayout.LayoutParams(-1,-2).apply { setMargins(0,0,0,16) }
-            addView(TextView(this@MenuActivity).apply { text=emoji; textSize=30f; gravity=Gravity.CENTER },LinearLayout.LayoutParams(70,70))
-            addView(LinearLayout(this@MenuActivity).apply {
-                orientation=LinearLayout.VERTICAL
-                addView(TextView(this@MenuActivity).apply { text=titulo; textSize=18f; typeface=Typeface.DEFAULT_BOLD; setTextColor(Color.parseColor("#1A237E")) })
-                addView(TextView(this@MenuActivity).apply { text=descricao; textSize=14f; setTextColor(Color.parseColor("#666680")); setPadding(0,5,0,0) })
-            },LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f))
-            setOnClickListener { click() }; isClickable=true; isFocusable=true
-        })
+    private fun opcao(@DrawableRes icone:Int,titulo:String,descricao:String,click:()->Unit){
+        val card=MaterialCardView(this).apply{
+            radius=dp(18).toFloat();strokeWidth=dp(1);strokeColor=Color.parseColor("#E1E3EE")
+            cardElevation=dp(1).toFloat();setCardBackgroundColor(Color.WHITE)
+            isClickable=true;isFocusable=true;setOnClickListener{click()}
+            layoutParams=LinearLayout.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT,ViewGroup.LayoutParams.WRAP_CONTENT).apply{bottomMargin=dp(14)}
+        }
+        val linha=LinearLayout(this).apply{
+            orientation=LinearLayout.HORIZONTAL;gravity=Gravity.CENTER_VERTICAL
+            setPadding(dp(16),dp(17),dp(14),dp(17))
+        }
+        linha.addView(ImageView(this).apply{
+            setImageResource(icone);imageTintList=ColorStateList.valueOf(Color.parseColor("#5C6BC0"))
+            background=getDrawable(R.drawable.bg_menu_icon);setPadding(dp(12),dp(12),dp(12),dp(12))
+        },LinearLayout.LayoutParams(dp(50),dp(50)).apply{marginEnd=dp(14)})
+        linha.addView(LinearLayout(this).apply{
+            orientation=LinearLayout.VERTICAL
+            addView(TextView(this@MenuActivity).apply{text=titulo;textSize=17f;typeface=Typeface.DEFAULT_BOLD;setTextColor(Color.parseColor("#1A237E"))})
+            addView(TextView(this@MenuActivity).apply{text=descricao;textSize=14f;setTextColor(Color.parseColor("#666680"));setPadding(0,dp(4),0,0)})
+        },LinearLayout.LayoutParams(0,ViewGroup.LayoutParams.WRAP_CONTENT,1f))
+        linha.addView(TextView(this).apply{text="›";textSize=30f;gravity=Gravity.CENTER;setTextColor(Color.parseColor("#9FA8DA"))},LinearLayout.LayoutParams(dp(28),dp(48)))
+        card.addView(linha);opcoes.addView(card)
     }
-    private fun abrir(clazz:Class<*>) = startActivity(Intent(this,clazz).apply {
-        putExtra("ID_USUARIO",Sessao.idUsuario(this@MenuActivity)); putExtra("NOME_USUARIO",Sessao.nome(this@MenuActivity)); putExtra("ID_TURMA",Sessao.idTurma(this@MenuActivity))
+
+    private fun dp(valor:Int)=(valor*resources.displayMetrics.density).toInt()
+    private fun abrir(clazz:Class<*>)=startActivity(Intent(this,clazz).apply{
+        putExtra("ID_USUARIO",Sessao.idUsuario(this@MenuActivity));putExtra("NOME_USUARIO",Sessao.nome(this@MenuActivity));putExtra("ID_TURMA",Sessao.idTurma(this@MenuActivity))
     })
     private fun abrirSelecao(modo:String)=startActivity(Intent(this,SelecionarRelatorioActivity::class.java).putExtra("MODO",modo))
-    private fun voltarLogin() { startActivity(Intent(this,LoginActivity::class.java).apply { flags=Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK }); finish() }
+    private fun voltarLogin(){startActivity(Intent(this,LoginActivity::class.java).apply{flags=Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TASK});finish()}
 }

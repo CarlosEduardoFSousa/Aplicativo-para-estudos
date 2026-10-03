@@ -8,15 +8,25 @@ CREATE TABLE IF NOT EXISTS livro_didatico (
  ativo TINYINT NOT NULL DEFAULT 1,
  criado_em TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS frente_livro (
+ id_frente INT AUTO_INCREMENT PRIMARY KEY,
+ id_livro INT NOT NULL,
+ ordem INT NOT NULL,
+ titulo VARCHAR(255) NOT NULL,
+ FOREIGN KEY (id_livro) REFERENCES livro_didatico(id_livro),
+ UNIQUE KEY livro_frente_ordem (id_livro, ordem)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS capitulo_livro (
  id_capitulo INT AUTO_INCREMENT PRIMARY KEY,
  id_livro INT NOT NULL,
+ id_frente INT NULL,
  ordem INT NOT NULL,
  titulo VARCHAR(255) NOT NULL,
  paginas_json LONGTEXT NOT NULL,
  revisado TINYINT NOT NULL DEFAULT 0,
  FOREIGN KEY (id_livro) REFERENCES livro_didatico(id_livro),
- UNIQUE KEY livro_ordem (id_livro, ordem)
+ FOREIGN KEY (id_frente) REFERENCES frente_livro(id_frente),
+ UNIQUE KEY frente_capitulo_ordem (id_frente, ordem)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE IF NOT EXISTS estudo_gerado (
  id_estudo INT AUTO_INCREMENT PRIMARY KEY,

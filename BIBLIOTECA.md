@@ -1,65 +1,51 @@
-# Estudo por capítulos
+# Biblioteca didática
 
-Implementado: login do aluno → matérias → escolha do capítulo → resumo com páginas → quiz de cinco questões com explicação e fonte. As matérias sem capítulos publicados exibem um estado vazio.
+O aluno escolhe matéria, frente e capítulo. Os 30 PDFs do catálogo do Drive foram processados neste banco local: 70 frentes e 337 unidades de estudo. Um clone novo precisa importar os PDFs uma vez; o catálogo no Git não contém o texto dos livros. O número de unidades pode ser maior que o número de capítulos impressos, pois capítulos extensos são divididos em partes para caber integralmente na solicitação à IA. Cada unidade guarda o texto e o número físico das páginas do PDF. A consulta no app lê o banco; ela não baixa nem extrai os PDFs a cada acesso.
 
-## Estratégia
+## Como preparar os livros
 
-O PHP envia o texto completo do capítulo selecionado ao Gemini, sem ferramentas de busca. Não basta enviar o link da pasta: é necessário extrair, organizar e revisar cada PDF. Para este TCC, contexto por capítulo é mais simples do que manter um banco vetorial e evita que a recuperação de poucos trechos deixe partes importantes do capítulo de fora.
-
-O servidor exige cinco questões, quatro alternativas distintas, uma correta e referências literais existentes nas páginas do capítulo. Cada parágrafo do resumo também exige referência. Isso verifica a existência da evidência, mas **não prova que a interpretação da IA está correta**. Revisão pedagógica continua recomendada. Diagramas e fórmulas ilegíveis não são tratados adequadamente por extração de texto; precisam de transcrição/OCR revisado.
-
-## Instalação
-
-1. No banco `appest`, execute `php_appest/biblioteca.sql` depois das migrações existentes. Não substitua o banco atual.
-2. Publique os novos endpoints PHP junto da API existente. Requisitos: PHP 8+, mysqli/mysqlnd e cURL; tabelas InnoDB e UTF-8.
-3. Configure `GEMINI_API_KEY` e `GEMINI_MODEL` no ambiente do processo PHP/Apache. Use um modelo disponível na sua conta com suporte a `generateContent` e `responseSchema`. Reinicie o serviço após alterar o ambiente. A chave não deve ficar no Android nem em arquivo público. A configuração antiga em `local.properties` não é mais usada.
-4. Prepare os livros conforme abaixo e execute a importação CLI no servidor. Somente capítulos com `revisado: true` aparecem aos alunos.
-5. Compile o Android e mantenha `ApiConfig.BASE_URL` apontando para a API instalada. O proxy/Apache deve permitir ao menos 120 segundos para a geração; o PHP aguarda até 100 segundos pelo provedor. Os próximos acessos reutilizam o cache por capítulo, dificuldade e modelo.
-
-Atualização do login: o banco local foi preparado pelo instalador e a API local está configurada. Consulte `EXECUTAR.md`. Ainda não há credencial Gemini configurada nem publicação de todos os livros. Não há geração de exemplo fingindo ser conteúdo do livro.
-
-## Preparação dos livros
-
-O arquivo `biblioteca/matematica-basica.manifesto.json` registra os nove capítulos encontrados nos marcadores do PDF indicado no Drive. A contagem é a página física do PDF, começando em 1; ela difere do número impresso. Gabarito e tabelas finais ficam fora dos capítulos.
-
-`biblioteca/catalogo-drive.json` contém o inventário dos 30 PDFs localizados na pasta compartilhada. É um inventário de fontes, não uma importação concluída. O PDF de Matemática básica foi extraído em `../tmp/pdfs/matematica-extraida.json`, ainda sem revisão. Os outros 29 PDFs precisam passar pela mesma preparação antes de aparecerem no aplicativo.
+O catálogo inicial está em `biblioteca/catalogo-drive.json`. Para importar todos os PDFs cadastrados, com PHP, Python 3, `pypdf` e `pdftotext` (Poppler) instalados:
 
 ```powershell
-python -m pip install pypdf
-python php_appest/tools/extrair_livro.py caminho/livro.pdf biblioteca/matematica-basica.manifesto.json livro-extraido.json
+php php_appest/tools/importar_drive_automatico.php --todos
 ```
 
-Abra o JSON e confira todos os capítulos contra o PDF, especialmente sinais, raízes, frações, tabelas e exercícios. Corrija o texto extraído e só então marque `revisado: true` em cada capítulo conferido. O extrator sempre gera rascunhos. PDFs sem texto exigem OCR antes deste passo. Capítulos acima de 180 KB de texto JSON devem ser divididos em partes explicitamente nomeadas; a API não corta o conteúdo silenciosamente.
+Para um único livro: `php php_appest/tools/importar_drive_automatico.php --id ID_DO_DRIVE`. O comando baixa o PDF para `.runtime/pdfs`, extrai os marcadores de frentes e capítulos, prepara o texto e grava no MySQL. Livros já publicados são ignorados, então o processamento demorado ocorre uma vez. Use `--reprocess` para criar uma nova versão quando o PDF ou o extrator mudar. A versão anterior é desativada sem apagar o histórico. O instalador do app apenas sincroniza os metadados de livros ausentes; não baixa PDFs nem reativa versões retiradas.
 
-```powershell
-cd php_appest
-php tools/importar_livro.php caminho/livro-extraido.json
-```
+O ambiente Docker inclui Python, `pypdf` e Poppler. Em outra instalação, configure `PDF_PYTHON_BIN` se o Python com `pypdf` não estiver no PATH. A importação só pode ser executada por linha de comando no servidor; não existe endpoint de upload público. Guarde os PDFs e os JSONs preparados fora da pasta pública e fora do Git.
 
-A importação é transacional, rejeita páginas repetidas e é acessível apenas por linha de comando. Reimportar exatamente o mesmo JSON é rejeitado como duplicata; editar conteúdo gera outra versão. Guarde PDFs e JSONs extraídos fora da pasta pública do servidor.
+PDFs precisam ter texto selecionável e marcadores corretos para identificação automática. Um PDF digitalizado sem OCR, com marcadores ausentes ou texto insuficiente é recusado para revisão manual. Para importar um JSON preparado ou revisado manualmente, use `php php_appest/tools/importar_livro.php caminho/livro.json`. O formato aceita `frentes`, cada uma com seus `capitulos`, `paginas` e `revisado`. Arquivos antigos que possuem `capitulos` diretamente viram uma frente única.
 
-## Administração futura
+**A extração automática não equivale à revisão pedagógica.** Fórmulas, diagramas, tabelas e símbolos podem perder informação no texto do PDF. Antes de usar o material em avaliação formal, confira capítulos e respostas contra as páginas originais. O painel da coordenação permite enviar PDFs, informar páginas de capítulos quando faltam marcadores, inspecionar os capítulos publicados e desativar edições.
 
-As tabelas `livro_didatico`, `capitulo_livro` e `estudo_gerado` separam catálogo, conteúdo revisado e cache. Para retirar uma edição, desative-a sem apagar seu histórico:
+## Resumo e quiz
+
+O servidor envia apenas o texto completo do capítulo selecionado ao Gemini, dividido em trechos identificados, sem pesquisa na internet. A explicação é gerada somente depois de selecionar um capítulo e aborda apenas esse conteúdo. Ela combina pelo menos seis blocos com subtítulos e parágrafos, listas de tópicos em alguns blocos e palavras-chave do capítulo adequadas à matéria ao final, com extensão proporcional à fonte. O quiz tem sempre cinco questões de nível médio e quatro alternativas por questão. As perguntas e o feedback são autossuficientes, sem referências a páginas, ao PDF ou a um texto que não esteja no enunciado. As referências internas são recuperadas diretamente dos trechos originais selecionados pela IA e validadas contra o capítulo. Essa verificação confirma a origem do trecho, mas não garante a correção da interpretação da IA. Se a fonte for insuficiente ou a validação falhar, a API retorna erro.
+
+A orientação do professor vale para todos os alunos matriculados na turma naquela matéria. Ela permanece ativa até ser substituída; o primeiro aluno não a consome. Orientações individuais antigas ficam apenas no histórico. O cache considera o texto do capítulo, o modelo, a versão do formato e a orientação vigente. Estudos personalizados são reutilizados entre alunos da mesma turma, com autorização verificada também ao concluir o quiz. A primeira geração do novo formato pode demorar; as seguintes reutilizam o resultado. Os estudos e resultados anteriores são preservados.
+
+Os parágrafos da explicação do capítulo e o feedback das respostas do quiz usam justificação nativa no Android 8 ou superior. A criação e a atualização das colunas necessárias são feitas pelo instalador automaticamente ao executar o app pelo Android Studio, inclusive quando a API local já está aberta.
+
+Testes: `php php_appest/tests/estudo_formato_test.php` verifica a preservação do capítulo, referências e formato; `php php_appest/tests/estudo_turma_test.php` cria e remove um banco temporário isolado para testar dois alunos da turma, isolamento entre turmas, atualização da orientação e reenvios sem duplicação de resultados. Também verifica paginação do histórico, autorização da revisão, alternativa escolhida, tentativas antigas, progresso por capítulo distinto e separação mensal do ranking. O segundo teste requer permissão local para criar e remover esse banco temporário.
+
+O histórico usa `historico_estudos.php` com cursor `antes_id` e páginas de 20 tentativas. `revisar_estudo.php` exige o token do próprio aluno e o `id_quiz` retornado pela conclusão. A coluna aditiva `resposta_estudo.alternativa_escolhida` é nula em registros antigos. As referências e o JSON original do estudo continuam preservados; livros desativados podem ser revisados pelo dono da tentativa, mas não usados para novos quizzes. As consultas de progresso contam capítulos distintos e exibem apenas os capítulos ativos/revisados do catálogo atual.
+
+Configure `GEMINI_API_KEY` e `GEMINI_MODEL` em `config.local.php`, fora de `php_appest`, ou nas variáveis de ambiente da API. Nunca coloque a chave no Android. A conclusão do quiz é corrigida no servidor e registrada em histórico, ranking e gráficos do professor. A tentativa possui identificador único para evitar pontos duplicados em reenvios.
+
+## Administração do acervo
+
+As tabelas `livro_didatico`, `frente_livro`, `capitulo_livro` e `estudo_gerado` separam catálogo, conteúdo e cache. O painel da coordenação usa essa estrutura para publicar e desativar livros. Para retirar uma edição sem excluir o histórico, use o painel ou, em manutenção por SQL:
 
 ```sql
 UPDATE livro_didatico SET ativo=0 WHERE id_livro=ID_DA_EDICAO;
 ```
 
-Importe a edição nova, revise e publique seus capítulos. Não edite diretamente o texto de uma versão publicada: uma nova versão garante outro cache. Uma futura tela administrativa poderá reutilizar essas regras, acrescentando perfil de administrador, upload privado, revisão e ativação/desativação. Não foram abertos endpoints de upload a alunos ou professores.
+A listagem do aluno e a da coordenação consultam essas tabelas. A extração demorada ocorre somente quando um PDF novo é enviado ou alterado.
 
-As orientações livres do professor não entram nesta geração para evitar que desviem a fonte escolhida. A dificuldade continua disponível. O ranking e o registro de respostas mantêm o comportamento anterior; sua validação de notas no servidor é uma melhoria separada.
-
-## Validação
+## Verificação
 
 ```powershell
 php php_appest/tests/estudo_validacao_test.php
 cd tcc_conectado
 .\gradlew.bat :app:assembleDebug
 ```
-
-Teste integrado após configurar o servidor: login de aluno, matéria vazia, capítulo revisado, geração e cache, resumo, cinco respostas, resultado, sessão expirada, indisponibilidade da IA e desativação do livro. A ausência de chave, texto insuficiente, JSON inválido ou fonte inexistente gera erro; nunca questões genéricas.
-
-Validação atualizada: PHP e XMLs aprovados; testes do validador de estudos e testes HTTP dos três perfis passaram. A compilação `assembleDebug` terminou com sucesso e o APK foi instalado no emulador. O erro anterior de socket foi resolvido para a execução deste ambiente configurando `jdk.net.unixdomain.tmpdir`. A integração real com Gemini ainda depende da chave e de capítulos revisados.
-
-Referência técnica: [saídas estruturadas do Gemini](https://ai.google.dev/gemini-api/docs/generate-content/structured-output). O provedor ressalta que a validade do formato não substitui a validação dos valores.

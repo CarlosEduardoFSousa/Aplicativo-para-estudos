@@ -24,3 +24,7 @@ desktop.ini
 *.log
 config.local.php
 .runtime/
+
+# Arquivos temporários de QA e pacote duplicado de capturas.
+capturas/qa-login.png
+capturas/prints-tcc.zip

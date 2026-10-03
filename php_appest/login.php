@@ -10,6 +10,8 @@ require_once __DIR__ . '/perfis.php';
 exigirPost();
 $perfil = normalizarPerfil($_POST['tipo_perfil'] ?? null);
 if ($perfil === null) responderErro('Selecione Aluno, Professor ou Coordenação.', 422);
+// A coordenação entra exclusivamente pelo painel web, com limitação de tentativas.
+if ($perfil === 'admin') responderErro('Acesse o painel web da coordenação.',403);
 
 if (isset($_POST['email']) && isset($_POST['senha'])) {
     if (!is_string($_POST['email']) || !is_string($_POST['senha'])) responderErro('Dados inválidos.',422);
@@ -19,7 +21,7 @@ if (isset($_POST['email']) && isset($_POST['senha'])) {
     $sql = "SELECT u.id_usuario, u.nome, u.email, u.senha, u.tipo_perfil,
                    (SELECT MIN(m.id_turma) FROM matricula m WHERE m.id_aluno=u.id_usuario) AS id_turma
             FROM usuario u
-            WHERE u.email = ? LIMIT 1";
+            WHERE u.email = ? AND u.excluido_em IS NULL LIMIT 1";
 
     $stmt = $conn->prepare($sql);
     $stmt->bind_param("s", $email);
@@ -29,7 +31,7 @@ if (isset($_POST['email']) && isset($_POST['senha'])) {
     if ($result->num_rows === 1) {
         $user = $result->fetch_assoc();
 
-        if (password_verify($senha, $user['senha']) && normalizarPerfil($user['tipo_perfil']) === $perfil) {
+        if (normalizarPerfil($user['tipo_perfil']) === $perfil && password_verify($senha, $user['senha'])) {
             $id_turma = $user['id_turma'] ? intval($user['id_turma']) : 0;
             $token    = criarSessao($conn, intval($user['id_usuario']));
 

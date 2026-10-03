@@ -1,28 +1,76 @@
 <?php
 require_once __DIR__.'/auth.php';
-$usuario = exigirUsuarioLogado($conn);
-$perfil = strtolower($usuario['tipo_perfil']);
-$idTurma = inteiroDoPost('id_turma');
-$materia = trim($_POST['materia'] ?? '');
+require_once __DIR__.'/perfis.php';
 
-if ($perfil === 'aluno') {
-    $idAluno = $usuario['id_usuario'];
-    $sql = "SELECT h.materia, c.titulo AS topico, COUNT(*) AS respostas, SUM(h.acertou) AS acertos
-            FROM historico h JOIN capitulo_livro c ON c.id_capitulo=h.id_capitulo
-            WHERE h.id_aluno=? GROUP BY h.materia,c.id_capitulo,c.titulo ORDER BY h.materia,c.ordem";
-    $stmt=$conn->prepare($sql); $stmt->bind_param('i',$idAluno);
-} elseif ($perfil === 'professor') {
-    if ($idTurma===null) responderErro('Turma inválida.',422);
-    exigirTurmaDoProfessor($conn,$idTurma,$usuario['id_usuario']);
-    $sql = "SELECT h.materia, c.titulo AS topico, COUNT(*) AS respostas, SUM(h.acertou) AS acertos
-            FROM historico h JOIN capitulo_livro c ON c.id_capitulo=h.id_capitulo
-            JOIN matricula mt ON mt.id_aluno=h.id_aluno AND mt.id_turma=?
-            WHERE (?='' OR h.materia=?) GROUP BY h.materia,c.id_capitulo,c.titulo ORDER BY h.materia,c.ordem";
-    $stmt=$conn->prepare($sql); $stmt->bind_param('iss',$idTurma,$materia,$materia);
-} else responderErro('Perfil sem acesso a este relatório.',403);
-$stmt->execute(); $r=$stmt->get_result(); $dados=[];
-while($row=$r->fetch_assoc()) {
-    $total=(int)$row['respostas']; $acertos=(int)$row['acertos'];
-    $dados[]=['materia'=>$row['materia'],'topico'=>$row['topico'],'respostas'=>$total,'acertos'=>$acertos,'percentual'=>$total?round($acertos*100/$total,1):0];
+$usuario=exigirUsuarioLogado($conn);
+$perfil=normalizarPerfil($usuario['tipo_perfil']);
+$nivel=trim((string)($_POST['nivel'] ?? 'materias'));
+$materia=trim((string)($_POST['materia'] ?? ''));
+
+if (!in_array($perfil,['aluno','professor'],true)) responderErro('Perfil sem acesso a este relatório.',403);
+if (!in_array($nivel,['materias','conteudos'],true)) responderErro('Relatório inválido.',422);
+if ($nivel==='conteudos' && ($materia==='' || mb_strlen($materia)>80)) responderErro('Matéria inválida.',422);
+
+$idTurma=null;
+if ($perfil==='professor') {
+    $idTurma=inteiroDoPost('id_turma');
+    if (!$idTurma) responderErro('Turma inválida.',422);
+    exigirTurmaDoProfessor($conn,$idTurma,(int)$usuario['id_usuario']);
 }
-responderJson(['status'=>'sucesso','topicos'=>$dados]);
+
+$campo=$nivel==='materias' ? 'l.materia' : 'r.assunto';
+$filtroMateria=$nivel==='conteudos' ? ' AND l.materia=?' : '';
+$filtroPerfil=$perfil==='professor' ? 'q.id_turma=?' : 'q.id_aluno=?';
+$sql="SELECT $campo AS nome, l.materia,
+             COUNT(*) AS respostas, COALESCE(SUM(r.acertou),0) AS acertos,
+             COUNT(DISTINCT q.id_quiz) AS quizzes,
+             COUNT(DISTINCT q.id_aluno) AS alunos
+      FROM resposta_estudo r
+      JOIN quiz_estudo q ON q.id_quiz=r.id_quiz
+      JOIN estudo_gerado e ON e.id_estudo=q.id_estudo
+      JOIN capitulo_livro c ON c.id_capitulo=e.id_capitulo
+      JOIN livro_didatico l ON l.id_livro=c.id_livro
+      WHERE $filtroPerfil$filtroMateria
+      GROUP BY $campo,l.materia
+      ORDER BY l.materia,$campo";
+
+$stmt=$conn->prepare($sql);
+$idFiltro=$perfil==='professor' ? $idTurma : (int)$usuario['id_usuario'];
+if ($nivel==='conteudos') $stmt->bind_param('is',$idFiltro,$materia);
+else $stmt->bind_param('i',$idFiltro);
+$stmt->execute();
+$resultado=$stmt->get_result();
+$dados=[];
+$totalRespostas=0;
+$totalAcertos=0;
+while ($row=$resultado->fetch_assoc()) {
+    $respostas=(int)$row['respostas'];
+    $acertos=(int)$row['acertos'];
+    $erros=$respostas-$acertos;
+    $dados[]=[
+        'nome'=>$row['nome'],
+        'materia'=>$row['materia'],
+        'respostas'=>$respostas,
+        'acertos'=>$acertos,
+        'erros'=>$erros,
+        'percentual_acertos'=>$respostas ? round($acertos*100/$respostas,1) : 0,
+        'percentual_erros'=>$respostas ? round($erros*100/$respostas,1) : 0,
+        'quizzes'=>(int)$row['quizzes'],
+        'alunos'=>(int)$row['alunos'],
+    ];
+    $totalRespostas+=$respostas;
+    $totalAcertos+=$acertos;
+}
+
+responderJson([
+    'status'=>'sucesso',
+    'nivel'=>$nivel,
+    'materia'=>$materia,
+    'itens'=>$dados,
+    'resumo'=>[
+        'respostas'=>$totalRespostas,
+        'acertos'=>$totalAcertos,
+        'erros'=>$totalRespostas-$totalAcertos,
+        'percentual_acertos'=>$totalRespostas ? round($totalAcertos*100/$totalRespostas,1) : 0,
+    ],
+]);

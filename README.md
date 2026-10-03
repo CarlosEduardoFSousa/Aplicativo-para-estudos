@@ -1,110 +1,37 @@
-> **Execução e login por perfil:** consulte [EXECUTAR.md](EXECUTAR.md). No Android Studio, abra `tcc_conectado` desta pasta e execute no emulador. A compilação não inicia serviços externos. Para publicar a API e o MySQL sem XAMPP, siga [HOSPEDAGEM.md](HOSPEDAGEM.md). Para livros e IA, veja [BIBLIOTECA.md](BIBLIOTECA.md).
+# Academia de Gênios
 
-# Academia de Gênios — TCC
+Aplicativo Android e API PHP/MySQL para estudo por capítulos de livros didáticos. O aluno escolhe matéria, frente e capítulo, lê uma explicação detalhada com subtítulos e responde a um quiz de nível médio. Seus resultados alimentam o histórico, o ranking e os gráficos. O professor acompanha as turmas e personaliza o estudo de todos os alunos de uma turma por matéria.
 
-Sistema de quiz escolar com geração de questões por IA e acompanhamento de
-desempenho pelo professor.
+O aplicativo Android atende alunos e professores. A secretaria/coordenação usa um painel web separado, conectado à mesma API e ao mesmo banco, para administrar usuários, turmas e livros.
 
-O aluno escolhe uma matéria e um nível, o app gera as questões com a API Gemini
-e registra o resultado. O professor acompanha as turmas, lança e corrige notas,
-e pode escrever uma orientação em linguagem livre ("focar em frações", "confunde
-sujeito e objeto") que é transformada em prompt e aplicada nas próximas questões
-daquele aluno.
+## Executar no emulador
+
+Abra `tcc_conectado` no Android Studio e clique em Run com um emulador selecionado. No Windows, o build debug inicia o MySQL e a API PHP locais automaticamente; o emulador acessa a API por `10.0.2.2`. Se quiser iniciar a API sem compilar, execute `./iniciar-local.ps1`. Veja [EXECUTAR.md](EXECUTAR.md) para login, contas locais e detalhes do ambiente.
+
+**Em outro computador**, siga primeiro [PREPARAR_OUTRO_PC.md](PREPARAR_OUTRO_PC.md). O clone contém código, estrutura do banco e catálogo de livros; cada máquina cria seu próprio banco e suas próprias contas de demonstração. A chave da IA fica em `config.local.php` e precisa ser configurada separadamente.
+
+Os serviços locais iniciam em processos separados, com saídas em `.runtime`, para não manter os canais da compilação abertos. Isso permite ao Gradle finalizar mesmo quando MySQL e PHP continuam funcionando.
+
+A chave Gemini e o modelo ficam em `config.local.php`, fora da pasta pública `php_appest`, ou em variáveis de ambiente do servidor. Nunca coloque a chave no código Android ou em `local.properties`.
+
+## Acompanhamento do aluno
+
+O menu inclui **Meu histórico**, com data, capítulo e percentual de cada tentativa. A revisão mostra as cinco questões, a resposta escolhida, a correta e a explicação. Também permite estudar novamente o mesmo capítulo; o conteúdo segue a orientação atual da turma e aproveita o cache válido. Tentativas antigas continuam disponíveis, mas a alternativa escolhida só aparece quando foi registrada — o app não tenta adivinhá-la.
+
+Frentes e capítulos mostram o progresso: um capítulo fica concluído depois de salvar seu quiz, independentemente da nota. Repetir o quiz cria uma nova tentativa no histórico, preserva o melhor resultado exibido e não aumenta a quantidade de capítulos concluídos. O ranking continua mensal, com navegação entre os meses.
+
+O histórico carrega 20 tentativas por página e recicla os cartões na tela. A API usa índices e consultas agregadas para progresso, sem carregar textos de livros nem chamar a IA. A revisão carrega apenas as questões da tentativa escolhida. A geração do capítulo continua durante a rotação da tela; falhas oferecem nova tentativa mantendo a seleção. As migrações são aditivas e aplicadas automaticamente no início local.
+
+## Livros
+
+Nesta instalação local, os 30 PDFs do catálogo do Drive foram preparados no banco, com 70 frentes e 337 unidades de estudo. Esses textos não fazem parte do repositório: em um clone novo, importe os PDFs uma vez com `preparar-livros-local.ps1` ou pelo painel da coordenação. Depois disso, o aluno consulta o MySQL e não espera a extração do PDF a cada acesso. Leia [BIBLIOTECA.md](BIBLIOTECA.md) para detalhes.
 
 ## Estrutura
 
 ```text
-tcc_conectado/   App Android (Kotlin, Gradle)
-php_appest/      Backend PHP + MySQL
+tcc_conectado/   Aplicativo Android (Kotlin/Gradle)
+php_appest/      API PHP, migrações e importadores
+biblioteca/      Catálogo dos PDFs do Drive
 ```
 
-## Requisitos
-
-- Android Studio com JDK 21 e Android SDK (compileSdk 36, minSdk 24)
-- PHP 8 e MySQL/MariaDB (XAMPP atende)
-- Uma chave da API Google Gemini
-
-## Como subir o projeto
-
-### 1. Banco de dados
-
-Rode os scripts na ordem. Todos são aditivos (`CREATE TABLE IF NOT EXISTS`) e
-não apagam nada de um banco já existente.
-
-```bash
-mysql -u root < php_appest/banco_base_referencia.sql
-mysql -u root appest < php_appest/dashboard_desempenho.sql
-mysql -u root appest < php_appest/prompt_professor.sql
-mysql -u root appest < php_appest/cadastro_professor.sql
-```
-
-Para popular o banco com turmas, alunos e notas de demonstração:
-
-```bash
-php php_appest/seed_dashboard_demo.php
-```
-
-### 2. Backend
-
-Publique a pasta `php_appest/` no servidor web (em XAMPP, dentro de `htdocs/`).
-As credenciais do banco ficam em `php_appest/conexao.php`.
-
-### 3. App Android
-
-Copie `tcc_conectado/local.properties.example` para
-`tcc_conectado/local.properties` e preencha:
-
-- `sdk.dir` — caminho do Android SDK nesta máquina
-- `GEMINI_API_KEY` — sua chave da API Gemini
-
-O endereço do backend fica em `ApiConfig.kt`. O padrão
-(`http://10.0.2.2/php_appest/`) aponta para o `localhost` do PC visto de dentro
-do emulador. Para um aparelho físico, troque pelo IP da máquina na rede local.
-
-Depois é só abrir a pasta `tcc_conectado/` no Android Studio e rodar.
-
-## Cadastro de professor
-
-O perfil de professor dá acesso às notas da turma e ao envio de orientações
-para a IA, então ele não é auto-atribuído: o cadastro exige um código de
-convite emitido pela coordenação.
-
-Para emitir um código (só pela linha de comando, no servidor):
-
-```bash
-php php_appest/criar_convite_professor.php "Professores 2026" 5 30
-```
-
-Os argumentos são: descrição, quantos cadastros o código aceita e em quantos
-dias expira (`0` = sem prazo). O código aparece uma única vez na saída — no
-banco fica apenas o hash.
-
-Com o código em mãos, o professor toca em **"Sou professor. Criar conta"** na
-tela de login do app.
-
-O cadastro pela tela normal do app (`inserir_usuario.php`) cria **sempre** conta
-de aluno, qualquer que seja o conteúdo da requisição.
-
-## Segurança
-
-- O app nunca é fonte de verdade sobre quem é o usuário. Ele envia só o token
-  recebido no login; perfil, identidade e posse de turma são resolvidos no
-  servidor a cada requisição (`php_appest/auth.php`).
-- Trocar um `id_turma` ou `id_aluno` na requisição não dá acesso a dados de
-  outro professor: a posse é confirmada no banco antes de qualquer leitura ou
-  escrita.
-- Senhas são gravadas com `password_hash`. Códigos de convite também.
-- Nenhum segredo fica no código-fonte. A chave da Gemini vem do
-  `local.properties` (não versionado) ou da variável de ambiente
-  `GEMINI_API_KEY`.
-
-## Limitações conhecidas
-
-- A comunicação com o backend é HTTP puro (`usesCleartextTraffic`), adequado
-  para o ambiente local de desenvolvimento. Uma instalação real precisa de
-  HTTPS antes de sair da rede da escola.
-- Os endpoints administrativos de CRUD (`inserir_turma.php`,
-  `deletar_usuario.php`, `atualizar_*.php`, `listar_usuarios.php` e afins) ainda
-  não exigem autenticação. Eles não são chamados pelo app, mas ficam acessíveis
-  a quem alcançar o servidor — não publique a pasta em rede aberta sem antes
-  protegê-los.
+A API pode ser hospedada separadamente do Android. A hospedagem será configurada depois da conclusão do TCC; o roteiro atual está em [HOSPEDAGEM.md](HOSPEDAGEM.md).

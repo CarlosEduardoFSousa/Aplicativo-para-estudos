@@ -19,8 +19,8 @@ if ($nome === '' || $email === '' || $senha === '') {
     responderErro("Preencha nome, e-mail e senha.", 422);
 }
 
-if (mb_strlen($nome) < 3 || mb_strlen($nome) > 120) {
-    responderErro("O nome deve ter entre 3 e 120 caracteres.", 422);
+if (mb_strlen($nome) < 3 || mb_strlen($nome) > 100) {
+    responderErro("O nome deve ter entre 3 e 100 caracteres.", 422);
 }
 
 if (!filter_var($email, FILTER_VALIDATE_EMAIL) || mb_strlen($email) > 150) {

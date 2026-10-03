@@ -1,12 +1,20 @@
 package com.github.carloseduardofsousa.tcc
 
 import android.content.Intent
+import android.graphics.Color
+import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
+import android.os.Build
+import android.text.Layout
 import android.view.View
 import android.widget.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.ViewModelProvider
+import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.repeatOnLifecycle
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -18,30 +26,95 @@ class CapitulosActivity : AppCompatActivity() {
     private lateinit var progresso: ProgressBar
     private var estudo: String? = null
     private var ocupado = false
+    private lateinit var preparacao: PrepararEstudoModel
+    private var versaoProgresso = ProgressoAluno.versao
+    private fun dp(valor: Int) = (valor * resources.displayMetrics.density).toInt()
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (!Sessao.estaLogado(this)) { Sessao.encerrar(this); finish(); return }
+        preparacao = ViewModelProvider(this)[PrepararEstudoModel::class.java]
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            val p = (20 * resources.displayMetrics.density).toInt()
+            val p = dp(20)
             setPadding(p,p,p,p)
+            setBackgroundColor(Color.parseColor("#F5F7FA"))
         }
-        root.addView(Button(this).apply { text = "Voltar"; setOnClickListener { finish() } })
-        root.addView(TextView(this).apply { text = intent.getStringExtra("MATERIA") ?: "Capítulos"; textSize = 26f })
-        status = TextView(this).apply { textSize = 17f }
+        root.addView(Button(this).apply { text = "← Voltar"; isAllCaps = false; setOnClickListener { finish() } })
+        root.addView(TextView(this).apply {
+            text = intent.getStringExtra("FRENTE") ?: "Capítulos"
+            textSize = 26f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#1A237E")); setPadding(0,dp(18),0,dp(4))
+        })
+        root.addView(TextView(this).apply {
+            text = intent.getStringExtra("MATERIA").orEmpty()
+            textSize = 15f; setTextColor(Color.parseColor("#666680"))
+        })
+        status = TextView(this).apply { textSize = 16f; setTextColor(Color.parseColor("#455A64")); setPadding(0,dp(16),0,dp(10)) }
         root.addView(status)
         progresso = ProgressBar(this)
         root.addView(progresso)
         lista = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         root.addView(ScrollView(this).apply { addView(lista) }, LinearLayout.LayoutParams(-1,0,1f))
+        EstudoUi.protegerBarras(root)
         setContentView(root)
         estudo = savedInstanceState?.getString("estudo")
-        if (estudo != null) mostrarEstudo(JSONObject(estudo!!)) else carregar()
+        val abrir = intent.getIntExtra("ID_CAPITULO_ABRIR", 0)
+        if (estudo != null) mostrarEstudo(JSONObject(estudo!!))
+        else if (preparacao.estado.value.idCapitulo > 0) { /* A geração continua ao girar a tela. */ }
+        else if (savedInstanceState != null && savedInstanceState.getInt("capitulo_pendente", 0) > 0) {
+            mostrarFalhaGeracao(savedInstanceState.getInt("capitulo_pendente"), savedInstanceState.getString("titulo_pendente").orEmpty(), "A preparação foi interrompida. Toque em tentar novamente para continuar neste capítulo.")
+        } else if (abrir > 0) {
+            intent.removeExtra("ID_CAPITULO_ABRIR")
+            gerar(abrir, intent.getStringExtra("CAPITULO_ABRIR").orEmpty())
+        } else carregar()
+        lifecycleScope.launch {
+            repeatOnLifecycle(Lifecycle.State.STARTED) {
+                preparacao.estado.collect { estado ->
+                    if (estado.idCapitulo <= 0) return@collect
+                    intent.putExtra("ID_CAPITULO_SELECIONADO", estado.idCapitulo)
+                    if (estado.carregando) {
+                        lista.removeAllViews(); progresso.visibility = View.VISIBLE
+                        status.text = "Preparando ${estado.titulo}…\nA explicação e as questões usam o conteúdo deste capítulo. Na primeira vez, isso pode levar até dois minutos."
+                    } else estado.resposta?.let { resposta ->
+                        progresso.visibility = View.GONE
+                        if (resposta.sessaoExpirada) { Sessao.encerrar(this@CapitulosActivity); return@collect }
+                        val json = runCatching { JSONObject(resposta.corpo.orEmpty()) }.getOrNull()
+                        if (!resposta.sucesso || json?.optString("status") != "sucesso") {
+                            mostrarFalhaGeracao(estado.idCapitulo, estado.titulo, resposta.mensagemErro("Não foi possível preparar este capítulo. Tente novamente."))
+                        } else if (estudo != resposta.corpo) {
+                            estudo = resposta.corpo; mostrarEstudo(json)
+                        }
+                    }
+                }
+            }
+        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString("estudo", estudo)
+        outState.putInt("capitulo_pendente", preparacao.estado.value.idCapitulo)
+        outState.putString("titulo_pendente", preparacao.estado.value.titulo)
+    }
+
+    private fun gerar(id: Int, titulo: String) {
+        preparacao.gerar(Sessao.token(this), id, titulo, intent.getIntExtra("ID_TURMA", Sessao.idTurma(this)))
+    }
+
+    private fun mostrarFalhaGeracao(id: Int, titulo: String, mensagem: String) {
+        progresso.visibility = View.GONE; lista.removeAllViews()
+        status.text = "$titulo\n$mensagem"
+        lista.addView(EstudoUi.botao(this, "Tentar novamente") { gerar(id, titulo) })
+        lista.addView(EstudoUi.botao(this, "Escolher outro capítulo") { preparacao.limpar(); carregar() })
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::preparacao.isInitialized && versaoProgresso != ProgressoAluno.versao) {
+            versaoProgresso = ProgressoAluno.versao
+            if (estudo == null && preparacao.estado.value.idCapitulo == 0 && !ocupado) carregar()
+        }
     }
 
     private fun requisitar(endpoint: String, params: Map<String,String>, pronto: (JSONObject) -> Unit) {
@@ -50,7 +123,7 @@ class CapitulosActivity : AppCompatActivity() {
         progresso.visibility = View.VISIBLE
         lifecycleScope.launch {
             val resposta = withContext(Dispatchers.IO) {
-                ApiClient.postComStatus(endpoint, params + ("token" to Sessao.token(this@CapitulosActivity)), 115000)
+                ApiClient.postComStatus(endpoint, params + ("token" to Sessao.token(this@CapitulosActivity)), if (endpoint == "gerar_estudo.php") 115000 else 8000)
             }
             ocupado = false
             progresso.visibility = View.GONE
@@ -62,7 +135,7 @@ class CapitulosActivity : AppCompatActivity() {
             }
             val json = runCatching { JSONObject(resposta.corpo ?: "") }.getOrNull()
             if (!resposta.sucesso || json?.optString("status") != "sucesso") {
-                status.text = json?.optString("mensagem") ?: "Não foi possível conectar. Tente novamente."
+                status.text = resposta.mensagemErro("Não foi possível carregar os capítulos.")
                 if (lista.childCount == 0) lista.addView(Button(this@CapitulosActivity).apply {
                     text = "Tentar novamente"; setOnClickListener { carregar() }
                 })
@@ -73,23 +146,28 @@ class CapitulosActivity : AppCompatActivity() {
     private fun carregar() {
         lista.removeAllViews()
         status.text = "Carregando capítulos…"
-        requisitar("listar_capitulos.php", mapOf("materia" to (intent.getStringExtra("MATERIA") ?: ""))) { json ->
+        requisitar("listar_capitulos.php", mapOf("id_frente" to intent.getIntExtra("ID_FRENTE",0).toString())) { json ->
             val capitulos = json.getJSONArray("capitulos")
-            status.text = if (capitulos.length() == 0) "Ainda não há capítulos revisados para esta matéria." else "Escolha o capítulo que deseja estudar"
+            val concluidos = json.optInt("concluidos")
+            status.text = if (capitulos.length() == 0) "Ainda não há capítulos disponíveis nesta frente." else "$concluidos de ${capitulos.length()} capítulos concluídos\nConclua o quiz para registrar seu progresso."
+            if (capitulos.length() > 0) lista.addView(ProgressBar(this, null, android.R.attr.progressBarStyleHorizontal).apply {
+                max = capitulos.length(); progress = concluidos
+                contentDescription = "$concluidos de ${capitulos.length()} capítulos concluídos"
+            }, LinearLayout.LayoutParams(-1, dp(12)).apply { bottomMargin = dp(12) })
             for (i in 0 until capitulos.length()) {
                 val c = capitulos.getJSONObject(i)
                 lista.addView(Button(this).apply {
-                    text = "${c.getString("livro")}\n${c.getString("titulo")}"
+                    text = c.getString("titulo") + if (c.optBoolean("concluido")) "\n✓ Concluído · melhor resultado: ${c.optDouble("melhor_percentual").toInt()}%" else "\nAinda não concluído"
                     isAllCaps = false
+                    textSize = 16f
+                    minHeight = dp(64)
+                    textAlignment = View.TEXT_ALIGNMENT_TEXT_START
+                    setPadding(dp(18),dp(12),dp(18),dp(12))
+                    backgroundTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+                    setTextColor(Color.parseColor("#1A237E"))
+                    layoutParams = LinearLayout.LayoutParams(-1,-2).apply { setMargins(0,0,0,dp(10)) }
                     setOnClickListener {
-                        if (!ocupado) {
-                            status.text = "Preparando resumo e quiz… Isso pode levar até dois minutos."
-                            intent.putExtra("ID_CAPITULO_SELECIONADO", c.getInt("id_capitulo"))
-                            requisitar("gerar_estudo.php", mapOf("id_capitulo" to c.getInt("id_capitulo").toString(), "dificuldade" to (intent.getStringExtra("DIFICULDADE") ?: "MEDIO"))) {
-                                estudo = it.toString()
-                                mostrarEstudo(it)
-                            }
-                        }
+                        if (!ocupado) gerar(c.getInt("id_capitulo"), c.getString("titulo"))
                     }
                 })
             }
@@ -97,37 +175,101 @@ class CapitulosActivity : AppCompatActivity() {
     }
 
     private fun mostrarEstudo(json: JSONObject) {
+        intent.putExtra("ID_TURMA", json.optInt("id_turma", Sessao.idTurma(this)))
         progresso.visibility = View.GONE
         lista.removeAllViews()
         status.text = "${json.getString("livro")}\n${json.getString("capitulo")}"
         val dados = json.getJSONObject("estudo")
         val resumo = dados.getJSONArray("resumo")
+        lista.addView(TextView(this).apply {
+            text = "Explicação do capítulo"
+            textSize = 22f; typeface = Typeface.DEFAULT_BOLD
+            setTextColor(Color.parseColor("#1A237E")); setPadding(0,dp(12),0,dp(12))
+        })
         for (i in 0 until resumo.length()) {
             val p = resumo.getJSONObject(i)
-            lista.addView(TextView(this).apply {
-                text = "${p.getString("texto")}\nFonte: página ${p.getInt("pagina")} do PDF\n"
-                textSize = 18f
-                setTextIsSelectable(true)
+            lista.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL
+                setPadding(dp(18),dp(18),dp(18),dp(16))
+                background = GradientDrawable().apply {
+                    setColor(Color.WHITE); cornerRadius = dp(16).toFloat()
+                    setStroke(dp(1),Color.parseColor("#E4E6F2"))
+                }
+                layoutParams = LinearLayout.LayoutParams(-1,-2).apply { setMargins(0,0,0,dp(12)) }
+                if (p.optString("titulo").isNotBlank()) addView(TextView(this@CapitulosActivity).apply {
+                    text = p.getString("titulo"); textSize = 19f; typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(Color.parseColor("#1A237E")); setPadding(0,0,0,dp(10))
+                })
+                addView(TextView(this@CapitulosActivity).apply {
+                    text = p.getString("texto").trim()
+                    textSize = 17f; setTextColor(Color.parseColor("#1A1A2E"))
+                    setLineSpacing(dp(5).toFloat(),1f); setTextIsSelectable(true)
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) justificationMode = Layout.JUSTIFICATION_MODE_INTER_WORD
+                })
+                val topicos = p.optJSONArray("topicos")
+                if (topicos != null) for (j in 0 until topicos.length()) {
+                    addView(LinearLayout(this@CapitulosActivity).apply {
+                        orientation = LinearLayout.HORIZONTAL; setPadding(0,dp(10),0,0)
+                        addView(TextView(this@CapitulosActivity).apply {
+                            text = "•"; textSize = 18f; setTextColor(Color.parseColor("#5C6BC0"))
+                        }, LinearLayout.LayoutParams(dp(20),-2))
+                        addView(TextView(this@CapitulosActivity).apply {
+                            text = topicos.getString(j); textSize = 17f
+                            setTextColor(Color.parseColor("#1A1A2E")); setLineSpacing(dp(4).toFloat(),1f)
+                            setTextIsSelectable(true)
+                        }, LinearLayout.LayoutParams(0,-2,1f))
+                    })
+                }
+                addView(TextView(this@CapitulosActivity).apply {
+                    text = "Fonte: página ${p.getInt("pagina")} do livro"
+                    textSize = 13f; setTextColor(Color.parseColor("#5C6BC0"))
+                    setPadding(0,dp(12),0,0)
+                })
+            })
+        }
+        val palavrasChave = dados.optJSONArray("palavras_chave")
+        if (palavrasChave != null && palavrasChave.length() > 0) {
+            lista.addView(LinearLayout(this).apply {
+                orientation = LinearLayout.VERTICAL; setPadding(dp(18),dp(18),dp(18),dp(18))
+                background = GradientDrawable().apply { setColor(Color.parseColor("#E8EAF6")); cornerRadius = dp(16).toFloat() }
+                layoutParams = LinearLayout.LayoutParams(-1,-2).apply { setMargins(0,0,0,dp(16)) }
+                addView(TextView(this@CapitulosActivity).apply {
+                    text = "Palavras-chave do capítulo"; textSize = 20f; typeface = Typeface.DEFAULT_BOLD
+                    setTextColor(Color.parseColor("#1A237E")); setPadding(0,0,0,dp(10))
+                })
+                addView(TextView(this@CapitulosActivity).apply {
+                    text = (0 until palavrasChave.length()).joinToString("  •  ") { palavrasChave.getString(it) }
+                    textSize = 16f; setTextColor(Color.parseColor("#303F9F")); setLineSpacing(dp(6).toFloat(),1f)
+                    setTextIsSelectable(true)
+                })
             })
         }
         lista.addView(Button(this).apply {
-            text = "Abrir livro original"
-            setOnClickListener {
-                runCatching { startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(json.getString("fonte_url")))) }
-                    .onFailure { Toast.makeText(this@CapitulosActivity,"Nenhum navegador disponível",Toast.LENGTH_SHORT).show() }
-            }
-        })
-        lista.addView(Button(this).apply {
             text = "Iniciar quiz — 5 questões"
+            isAllCaps = false
+            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#5C6BC0"))
+            setTextColor(Color.WHITE)
             setOnClickListener {
                 startActivity(Intent(this@CapitulosActivity, MainActivity::class.java).apply {
                     this@CapitulosActivity.intent.extras?.let { putExtras(it) }
                     putExtra("QUESTOES_JSON", dados.getJSONArray("questoes").toString())
+                    putExtra("ID_ESTUDO", json.getInt("id_estudo"))
                     putExtra("ID_CAPITULO", intent.getIntExtra("ID_CAPITULO_SELECIONADO", 0))
                     putExtra("MATERIA", intent.getStringExtra("MATERIA"))
                 })
             }
         })
-        lista.addView(Button(this).apply { text = "Escolher outro capítulo"; setOnClickListener { estudo = null; carregar() } })
+        lista.addView(Button(this).apply {
+            text = "Abrir livro original"
+            isAllCaps = false
+            setOnClickListener {
+                runCatching {
+                    val fonte = java.net.URL(java.net.URL(ApiConfig.BASE_URL), json.getString("fonte_url")).toString()
+                    startActivity(Intent(Intent.ACTION_VIEW, Uri.parse(fonte)))
+                }
+                    .onFailure { Toast.makeText(this@CapitulosActivity,"Nenhum navegador disponível",Toast.LENGTH_SHORT).show() }
+            }
+        })
+        lista.addView(Button(this).apply { text = "Escolher outro capítulo"; setOnClickListener { estudo = null; preparacao.limpar(); carregar() } })
     }
 }

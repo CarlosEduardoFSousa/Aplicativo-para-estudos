@@ -21,7 +21,7 @@ privadas. O banco não precisa ficar exposto publicamente.
    MYSQLUSER=${{MySQL.MYSQLUSER}}
    MYSQLPASSWORD=${{MySQL.MYSQLPASSWORD}}
    GEMINI_API_KEY=SUA_CHAVE_GEMINI
-   GEMINI_MODEL=gemini-2.5-flash
+   GEMINI_MODEL=gemini-3.5-flash-lite
    ```
 
    Se o serviço do banco tiver outro nome, substitua `MySQL` pelo nome mostrado no
@@ -42,15 +42,14 @@ saúde impede que uma implantação quebrada receba tráfego.
 
 ## Desenvolvimento local opcional
 
-O XAMPP não inicia mais durante a compilação. Caso seja necessário testar a API local,
-execute uma vez na raiz:
+O build debug no Windows inicia a API local somente quando `API_BASE_URL` aponta para
+`10.0.2.2:8088`. Para iniciá-la sem compilar, execute na raiz:
 
 ```powershell
 .\iniciar-local.ps1
 ```
 
-Ou use a tarefa Gradle `prepararAmbienteLocal`. Depois disso, o botão Run apenas
-compila e instala o aplicativo. Para voltar ao servidor local no emulador:
+Ou use a tarefa Gradle `prepararAmbienteLocal`. Para voltar ao servidor local no emulador:
 
 ```properties
 API_BASE_URL=http://10.0.2.2:8088/php_appest/
@@ -58,4 +57,3 @@ API_BASE_URL=http://10.0.2.2:8088/php_appest/
 
 Antes de uso real, habilite backups do MySQL no provedor e troque qualquer credencial
 que tenha sido usada em testes.
-

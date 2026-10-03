@@ -30,7 +30,7 @@
             android:layout_marginBottom="28dp"
             android:gravity="center"
             android:id="@+id/txtSubtituloCadastro"
-            android:text="Use o código de convite fornecido pela coordenação da escola."
+            android:text="Use o código de convite fornecido pela escola."
             android:textColor="@color/TextoSecundario"
             android:textSize="14sp" />
 

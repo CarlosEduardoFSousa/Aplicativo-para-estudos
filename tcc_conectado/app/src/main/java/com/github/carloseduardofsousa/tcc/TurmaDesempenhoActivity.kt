@@ -33,8 +33,7 @@ data class AlunoDesempenho(
 
 // ── Adapter da lista de alunos ──────────────────────────────
 class AlunoDesempenhoAdapter(
-    private val items: List<AlunoDesempenho>,
-    private val onEnviarPrompt: (AlunoDesempenho) -> Unit
+    private val items: List<AlunoDesempenho>
 ) : RecyclerView.Adapter<AlunoDesempenhoAdapter.VH>() {
 
     inner class VH(val card: LinearLayout) : RecyclerView.ViewHolder(card)
@@ -58,16 +57,6 @@ class AlunoDesempenhoAdapter(
             addView(tvNome)
             addView(tvInfo)
         }
-        val btnPrompt = Button(ctx).apply {
-            text = "🤖 Prompt IA"
-            textSize = 12f
-            setTextColor(Color.WHITE)
-            backgroundTintList = android.content.res.ColorStateList.valueOf(Color.parseColor("#5C6BC0"))
-            layoutParams = LinearLayout.LayoutParams(
-                ViewGroup.LayoutParams.WRAP_CONTENT,
-                ViewGroup.LayoutParams.WRAP_CONTENT
-            )
-        }
 
         val card = LinearLayout(ctx).apply {
             orientation = LinearLayout.HORIZONTAL
@@ -82,7 +71,7 @@ class AlunoDesempenhoAdapter(
                 setColor(Color.WHITE)
             }
             addView(textos)
-            addView(btnPrompt)
+
         }
         return VH(card)
     }
@@ -95,8 +84,7 @@ class AlunoDesempenhoAdapter(
         (textos.getChildAt(1) as TextView).text =
             "🏆 ${aluno.pontosTotal} pontos · ${aluno.mesesParticipados} mês(es) ativo(s)"
 
-        val btnPrompt = h.card.getChildAt(1) as Button
-        btnPrompt.setOnClickListener { onEnviarPrompt(aluno) }
+
     }
 
     override fun getItemCount() = items.size
@@ -184,15 +172,7 @@ class TurmaDesempenhoActivity : AppCompatActivity() {
                 scroll.visibility = View.VISIBLE
                 montarGrafico(alunos)
 
-                rvAlunos.adapter = AlunoDesempenhoAdapter(alunos) { aluno ->
-                    val intent = Intent(this, EnviarPromptActivity::class.java)
-                    intent.putExtra("NOME_PROFESSOR", nomeProfessor)
-                    intent.putExtra("ID_TURMA", idTurma)
-                    intent.putExtra("ID_ALUNO", aluno.idAluno)
-                    intent.putExtra("NOME_ALUNO", aluno.nome)
-                    intent.putExtra("PONTOS_ALUNO", aluno.pontosTotal)
-                    startActivity(intent)
-                }
+                rvAlunos.adapter = AlunoDesempenhoAdapter(alunos)
             }
         }.start()
     }

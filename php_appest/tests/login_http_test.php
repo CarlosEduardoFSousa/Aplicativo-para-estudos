@@ -16,7 +16,9 @@ try {
     foreach ($contas as $c) {
         foreach (['aluno','professor','admin'] as $perfil) {
             [$http,$r]=postTeste('login.php',['email'=>$c['email'],'senha'=>$c['senha'],'tipo_perfil'=>$perfil]);
-            if ($c['perfil']===$perfil) {
+            if ($perfil==='admin') {
+                checar($http===403 && !isset($r['token']),'Coordenação deveria entrar apenas pelo painel web.');
+            } elseif ($c['perfil']===$perfil) {
                 checar($http===200 && ($r['tipo_perfil']??'')===$perfil && strlen($r['token']??'')===64,'Login correto falhou: '.$perfil);
                 $tokens[$perfil]=$r['token'];
             } else checar($http===401 && !isset($r['token']),'Perfil incorreto recebeu acesso.');
@@ -41,7 +43,7 @@ try {
     [$http,$r]=postTeste('login.php',['email'=>$contas[0]['email'],'senha'=>$contas[0]['senha'],'tipo_perfil'=>'aluno']);
     checar($http===200,'Aluno com múltiplas matrículas não entrou.');
     if (isset($r['token'])) postTeste('logout.php',['token'=>$r['token']]);
-    echo "OK: 3 logins corretos, 6 perfis trocados recusados, perfis inválidos, senha errada, autorização admin e múltiplas matrículas.\n";
+    echo "OK: logins de aluno/professor, perfis trocados recusados, coordenação exclusiva do painel, senha errada e múltiplas matrículas.\n";
 } finally {
     foreach ($tokens as $token) postTeste('logout.php',['token'=>$token]);
     if (isset($turma)) {

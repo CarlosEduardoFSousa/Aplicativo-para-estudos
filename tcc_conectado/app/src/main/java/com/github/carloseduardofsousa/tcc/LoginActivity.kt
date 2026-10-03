@@ -1,14 +1,18 @@
 package com.github.carloseduardofsousa.tcc
 
 import android.content.Intent
+import android.content.res.ColorStateList
+import android.graphics.Color
 import android.os.Bundle
 import android.view.View
+import android.view.inputmethod.EditorInfo
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
+import androidx.core.view.WindowCompat
 import android.widget.Button
 import android.widget.EditText
 import android.widget.ProgressBar
 import android.widget.Toast
-import android.widget.AutoCompleteTextView
-import android.widget.ArrayAdapter
 import android.widget.TextView
 import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
@@ -23,34 +27,43 @@ class LoginActivity : AppCompatActivity() {
     private lateinit var etSenha: EditText
     private lateinit var btnEntrar: Button
     private lateinit var progressBar: ProgressBar
-    private lateinit var seletor: AutoCompleteTextView
+    private lateinit var btnPerfilAluno: Button
+    private lateinit var btnPerfilProfessor: Button
     private lateinit var cadastro: Button
     private lateinit var status: TextView
-    private val perfis = listOf("aluno", "professor", "admin")
-    private val rotulos = listOf("Aluno", "Professor", "Coordenação")
+    private val perfis = listOf("aluno", "professor")
     private var perfil = "aluno"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+        if (Sessao.token(this).isNotEmpty() && !Sessao.estaLogado(this)) Sessao.limpar(this)
         setContentView(R.layout.activity_login)
+        val raiz = findViewById<View>(R.id.loginScroll)
+        EstudoUi.protegerBarras(raiz, incluirTeclado = true)
+        WindowCompat.getInsetsController(window, raiz).isAppearanceLightStatusBars = true
 
         etEmail    = findViewById(R.id.etEmail)
         etSenha    = findViewById(R.id.etSenha)
         btnEntrar  = findViewById(R.id.btnEntrar)
         progressBar = findViewById(R.id.progressBarLogin)
-        seletor = findViewById(R.id.seletorPerfil)
+        btnPerfilAluno = findViewById(R.id.btnPerfilAluno)
+        btnPerfilProfessor = findViewById(R.id.btnPerfilProfessor)
         cadastro = findViewById(R.id.btnIrCadastroProfessor)
         status = findViewById(R.id.statusLogin)
         perfil = savedInstanceState?.getString("perfil")?.takeIf { it in perfis } ?: "aluno"
-        seletor.setAdapter(ArrayAdapter(this, android.R.layout.simple_dropdown_item_1line, rotulos))
-        seletor.setText(rotulos[perfis.indexOf(perfil)], false)
-        seletor.setOnItemClickListener { _, _, pos, _ ->
-            perfil = perfis[pos]
-            atualizarPerfil()
-        }
+        btnPerfilAluno.setOnClickListener { selecionarPerfil("aluno") }
+        btnPerfilProfessor.setOnClickListener { selecionarPerfil("professor") }
         atualizarPerfil()
 
         btnEntrar.setOnClickListener { fazerLogin() }
+        etEmail.imeOptions = EditorInfo.IME_ACTION_NEXT
+        etSenha.imeOptions = EditorInfo.IME_ACTION_DONE
+        etSenha.setOnEditorActionListener { _, acao, _ ->
+            if (acao == EditorInfo.IME_ACTION_DONE) {
+                if (btnEntrar.isEnabled) fazerLogin()
+                true
+            } else false
+        }
 
         findViewById<Button>(R.id.btnIrCadastroProfessor).setOnClickListener {
             startActivity(Intent(this, CadastroProfessorActivity::class.java).putExtra("PERFIL_CADASTRO", perfil))
@@ -58,10 +71,24 @@ class LoginActivity : AppCompatActivity() {
     }
 
     private fun atualizarPerfil() {
-        btnEntrar.text = if (perfil == "admin") "Entrar na coordenação" else "Entrar como $perfil"
-        cadastro.visibility = if (perfil == "admin") View.GONE else View.VISIBLE
+        listOf(
+            btnPerfilAluno to "aluno",
+            btnPerfilProfessor to "professor"
+        ).forEach { (botao, tipo) ->
+            val selecionado = perfil == tipo
+            botao.backgroundTintList = ColorStateList.valueOf(
+                if (selecionado) Color.parseColor("#5C6BC0") else Color.parseColor("#EEEEEE")
+            )
+            botao.setTextColor(if (selecionado) Color.WHITE else Color.parseColor("#555555"))
+        }
+        btnEntrar.text = "Entrar como $perfil"
         cadastro.text = "Criar conta de $perfil"
-        status.text = if (perfil == "admin") "Use a conta fornecida pela administração." else "Use o e-mail e a senha da sua conta de $perfil."
+        status.text = "Use o e-mail e a senha da sua conta de $perfil."
+    }
+
+    private fun selecionarPerfil(tipo: String) {
+        perfil = tipo
+        atualizarPerfil()
     }
 
     override fun onSaveInstanceState(outState: Bundle) {
@@ -80,7 +107,8 @@ class LoginActivity : AppCompatActivity() {
         }
 
         btnEntrar.isEnabled = false
-        seletor.isEnabled = false
+        ViewCompat.getWindowInsetsController(etSenha)?.hide(WindowInsetsCompat.Type.ime())
+        botoesPerfil().forEach { it.isEnabled = false }
         cadastro.isEnabled = false
         status.text = "Entrando…"
         progressBar.visibility = View.VISIBLE
@@ -92,7 +120,7 @@ class LoginActivity : AppCompatActivity() {
 
                 progressBar.visibility = View.GONE
                 btnEntrar.isEnabled = true
-                seletor.isEnabled = true
+                botoesPerfil().forEach { it.isEnabled = true }
                 cadastro.isEnabled = true
 
                 if (resposta.corpo == null) {
@@ -134,4 +162,6 @@ class LoginActivity : AppCompatActivity() {
                 }
         }
     }
+
+    private fun botoesPerfil() = listOf(btnPerfilAluno, btnPerfilProfessor)
 }

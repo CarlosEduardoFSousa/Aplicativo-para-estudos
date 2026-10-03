@@ -66,15 +66,19 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 }
 
-// Comando opcional para quem ainda quiser usar a API local. Ele não faz parte do
-// build: compilar o Android nunca deve iniciar MySQL, executar migrações ou abrir
-// processos em segundo plano.
+val iniciarApiLocal = System.getProperty("os.name").startsWith("Windows") &&
+    apiBaseUrl == "http://10.0.2.2:8088/php_appest/" &&
+    providers.gradleProperty("skipLocalApi").orNull != "true"
+val scriptApiLocal = rootProject.file("../iniciar-local.ps1").absolutePath
+
 tasks.register<Exec>("prepararAmbienteLocal") {
     group = "development"
     description = "Inicia a API e o MySQL locais para o emulador Android."
-    onlyIf {
-        System.getProperty("os.name").startsWith("Windows")
-    }
+    enabled = iniciarApiLocal
     commandLine("powershell.exe", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File",
-        rootProject.file("../iniciar-local.ps1").absolutePath)
+        scriptApiLocal, "-Rapido")
+}
+
+tasks.matching { it.name == "preDebugBuild" }.configureEach {
+    dependsOn("prepararAmbienteLocal")
 }

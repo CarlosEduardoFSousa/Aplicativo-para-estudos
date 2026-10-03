@@ -1,12 +1,52 @@
 <?xml version="1.0" encoding="utf-8"?>
 <ScrollView xmlns:android="http://schemas.android.com/apk/res/android" xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/loginScroll"
     android:layout_width="match_parent" android:layout_height="match_parent" android:fillViewport="true" android:background="@color/BackGround">
     <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center_vertical" android:padding="28dp">
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Academia de Gênios" android:textSize="32sp" android:textStyle="bold" android:gravity="center" android:textColor="@color/btnSelecionado" />
         <TextView android:layout_width="match_parent" android:layout_height="wrap_content" android:text="Escolha seu perfil para entrar" android:textSize="16sp" android:gravity="center" android:layout_marginTop="8dp" android:layout_marginBottom="28dp" android:textColor="@color/BordaButton" />
-        <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:hint="Perfil de acesso" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox.ExposedDropdownMenu">
-            <AutoCompleteTextView android:id="@+id/seletorPerfil" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="none" android:importantForAutofill="no" android:textSize="18sp" />
-        </com.google.android.material.textfield.TextInputLayout>
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="TIPO DE USUÁRIO"
+            android:textSize="11sp"
+            android:textStyle="bold"
+            android:textColor="@color/LabelSecao"
+            android:letterSpacing="0.12"
+            android:layout_marginBottom="8dp" />
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
+
+            <Button
+                android:id="@+id/btnPerfilAluno"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_weight="1"
+                android:layout_marginEnd="4dp"
+                android:text="Aluno"
+                android:textSize="16sp"
+                android:textAllCaps="false"
+                android:textColor="#555555"
+                android:backgroundTint="#EEEEEE" />
+
+            <Button
+                android:id="@+id/btnPerfilProfessor"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:minHeight="48dp"
+                android:layout_weight="1"
+                android:layout_marginStart="4dp"
+                android:text="Professor"
+                android:textSize="16sp"
+                android:textAllCaps="false"
+                android:textColor="#555555"
+                android:backgroundTint="#EEEEEE" />
+        </LinearLayout>
         <com.google.android.material.textfield.TextInputLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="20dp" android:hint="E-mail" style="@style/Widget.MaterialComponents.TextInputLayout.OutlinedBox">
             <com.google.android.material.textfield.TextInputEditText android:id="@+id/etEmail" android:layout_width="match_parent" android:layout_height="wrap_content" android:inputType="textEmailAddress" android:autofillHints="emailAddress" />
         </com.google.android.material.textfield.TextInputLayout>

@@ -9,7 +9,7 @@
         android:progressTint="@color/PreencherBarra" />
     <ProgressBar android:id="@+id/progressCarregando" android:layout_width="wrap_content"
         android:layout_height="wrap_content" android:visibility="gone" />
-    <ScrollView android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
+    <ScrollView android:id="@+id/scrollQuestao" android:layout_width="match_parent" android:layout_height="0dp" android:layout_weight="1">
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
             <TextView android:id="@+id/txtPergunta" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="24dp" android:layout_marginBottom="16dp"
@@ -26,6 +26,10 @@
             <Button android:id="@+id/btnOpcaoD" android:layout_width="match_parent" android:layout_height="wrap_content"
                 android:layout_marginTop="8dp" android:padding="16dp" android:textAllCaps="false"
                 android:backgroundTint="@color/btnOpcoes" android:textColor="@color/BordaButton" android:textSize="16sp" />
+            <TextView android:id="@+id/txtExplicacao" android:layout_width="match_parent" android:layout_height="wrap_content"
+                android:layout_marginTop="20dp" android:padding="18dp" android:background="@color/ChipFundo"
+                android:textColor="@color/TextoPrincipal" android:textSize="16sp" android:lineSpacingExtra="5dp"
+                android:textIsSelectable="true" android:visibility="gone" />
         </LinearLayout>
     </ScrollView>
     <Button android:id="@+id/btnConfirmar" android:layout_width="match_parent" android:layout_height="wrap_content"
